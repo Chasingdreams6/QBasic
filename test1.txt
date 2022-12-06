@@ -1,3 +1,4 @@
 100 LET a = 5
 105 LET b = 10
 110 PRINT a + b
+120 PRINT (a + b) * (a + b)

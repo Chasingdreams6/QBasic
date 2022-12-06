@@ -42,7 +42,7 @@ private slots:
 
 private:
     Ui::MainWindow *ui;
-    QStringList list;
-    int pos, value;
+    QString list;
+    int pos, value, bios;
 };
 #endif // MAINWINDOW_H

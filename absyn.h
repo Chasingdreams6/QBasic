@@ -62,8 +62,9 @@ public:
     int pos_;
     Stm() {}
     Stm(int pos) : pos_(pos) {}
-    virtual int exec(QTextBrowser *res, QTextBrowser *tree) = 0;
+    virtual int exec(QTextBrowser *res, QTextBrowser *tree, int d) = 0;
     virtual void free() = 0;
+    virtual void print(QTextBrowser *tree, int d) = 0;
 };
 
 struct WrappedStm {
@@ -80,8 +81,9 @@ private:
     std::string str_;
 public:
     RemStm(int pos, std::string str) : Stm(pos), str_(std::move(str)){}
-    int exec(QTextBrowser *res, QTextBrowser *tree) override;
+    int exec(QTextBrowser *res, QTextBrowser *tree, int d) override;
     void free() override {}
+    void print(QTextBrowser *tree, int d) override;
 };
 
 class LetStm : public Stm {
@@ -91,8 +93,9 @@ private:
 public:
     LetStm(int pos, std::string sym, Exp *exp) :
         Stm(pos), sym_(sym), exp_(exp) {}
-    int exec(QTextBrowser *res, QTextBrowser *tree) override;
+    int exec(QTextBrowser *res, QTextBrowser *tree, int d) override;
     void free() override;
+    void print(QTextBrowser *tree, int d) override;
 };
 
 class PrintStm : public Stm {
@@ -101,8 +104,9 @@ private:
 public:
     PrintStm(int pos, Exp *exp) :
         Stm(pos), exp_(exp) {}
-    int exec(QTextBrowser *res, QTextBrowser *tree) override;
+    int exec(QTextBrowser *res, QTextBrowser *tree, int d) override;
     void free() override;
+    void print(QTextBrowser *tree, int d) override;
 };
 
 class InputStm : public Stm {
@@ -111,8 +115,9 @@ private:
 public:
     InputStm(int pos, std::string sym) :
         Stm(pos), sym_(std::move(sym)) {}
-    int exec(QTextBrowser *res, QTextBrowser *tree) override;
+    int exec(QTextBrowser *res, QTextBrowser *tree, int d) override;
     void free() override {}
+    void print(QTextBrowser *tree, int d) override;
 };
 
 class GotoStm : public Stm {
@@ -121,8 +126,9 @@ private:
 public:
     GotoStm(int pos, int to) :
         Stm(pos), to_(to) {}
-    int exec(QTextBrowser *res, QTextBrowser *tree) override;
+    int exec(QTextBrowser *res, QTextBrowser *tree, int d) override;
     void free() override {}
+    void print(QTextBrowser *tree, int d) override;
 };
 
 class IfStm : public Stm {
@@ -133,23 +139,26 @@ private:
 public:
     IfStm(int pos, Exp *exp1, Exp *exp2, enum Op op, int to) :
         Stm(pos), exp1_(exp1), exp2_(exp2), op_(op), to_(to) {}
-    int exec(QTextBrowser *res, QTextBrowser *tree) override;
+    int exec(QTextBrowser *res, QTextBrowser *tree, int d) override;
     void free() override;
+    void print(QTextBrowser *tree, int d) override;
 };
 
 class EndStm : public Stm {
 private:
 public:
     EndStm(int pos) : Stm(pos) {}
-    int exec(QTextBrowser *res, QTextBrowser *tree) override;
+    int exec(QTextBrowser *res, QTextBrowser *tree, int d) override;
     void free() override {}
+    void print(QTextBrowser *tree, int d) override;
 };
 
 class Exp {
 public:
     Exp () {}
-    virtual int getVal() = 0;
     virtual void free() = 0;
+    virtual int exec(QTextBrowser *res, QTextBrowser *tree, int d) = 0;
+    virtual void print(QTextBrowser *tree, int d) = 0;
 };
 
 class ConstExp : public Exp {
@@ -157,8 +166,9 @@ private:
     int val_;
 public:
     ConstExp(int val) : val_(val) {}
-    int getVal() override {return val_;}
     void free() override {}
+    int exec(QTextBrowser *res, QTextBrowser *tree, int d) override;
+    void print(QTextBrowser *tree, int d) override;
 };
 
 class IdExp : public Exp {
@@ -166,11 +176,9 @@ private:
     std::string sym_;
 public:
     IdExp(std::string sym) : sym_(std::move(sym)) {}
-    int getVal() override {
-        // TODO undefined vars
-        return intMap[sym_];
-    }
     void free() override {}
+    int exec(QTextBrowser *res, QTextBrowser *tree, int d) override;
+    void print(QTextBrowser *tree, int d) override;
 };
 
 class CompoundExp : public Exp {
@@ -180,8 +188,9 @@ private:
 public:
     CompoundExp(Exp *left, Exp *right, Op op) :
         left_(left), right_(right), op_(op) {}
-    int getVal() override;
     void free() override;
+    int exec(QTextBrowser *res, QTextBrowser *tree, int d) override;
+    void print(QTextBrowser *tree, int d) override;
 };
 
 #endif // ABSYN_H

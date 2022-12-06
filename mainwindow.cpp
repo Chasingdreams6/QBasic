@@ -3,9 +3,10 @@
 #include <exception>
 
 extern std::map<std::string, int> intMap;
-extern std::map<Op, int> prio;
+extern std::map<Token, int> prio;
 extern std::set<int> lines;
 extern std::map<int, WrappedStm> stms;
+extern std::map<Op, std::string> opC;
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -13,9 +14,15 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
 
-    prio[PLUS_OP] = prio[MINUS_OP] = 1;
-    prio[MUL_OP] = prio[DIV_OP] = 2;
-    prio[POW_OP] = 3;
+    prio[PLUS_TK] = prio[MINUS_TK] = 1;
+    prio[MUL_TK] = prio[DIV_TK] = 2;
+    prio[POW_TK] = 3;
+    prio[LPAREN_TK] = 4;
+
+    opC[PLUS_OP] = "+"; opC[MINUS_OP] = "-";
+    opC[MUL_OP] = "*"; opC[DIV_OP] = "/";
+    opC[POW_OP] = "**"; opC[EQ_OP] = "=";
+    opC[LT_OP] = "<"; opC[GT_OP] = ">";
 }
 
 MainWindow::~MainWindow()
@@ -24,37 +31,61 @@ MainWindow::~MainWindow()
 }
 
 bool MainWindow::arithToken(Token tk) {
-    if (tk == PLUS_TK || tk == MINUS_TK || tk == POW_TK || tk == DIV_TK) return true;
+    if (tk == PLUS_TK || tk == MINUS_TK || tk == MUL_TK || tk == DIV_TK) return true;
     if (tk == POW_TK || tk == LPAREN_TK || tk == RPAREN_TK || tk == INT_TK) return true;
     if (tk == STR_TK) return true;
     return false;
 }
 
+bool isLegalAlpha0(QChar x) {
+   return (x >= 'a' && x <= 'z')
+           || (x >= 'A' && x <= 'Z')
+           || (x == '_');
+}
+bool isLegalAlpha1(QChar x) {
+   return isLegalAlpha0(x) || (x >= '0' && x <= '9');
+}
 Token MainWindow::getToken() {
-    if (list[pos] == "") return NULL_TK;
-    if (list[pos] == "REM") return REM_TK;
-    if (list[pos] == "LET") return LET_TK;
-    if (list[pos] == "PRINT") return PRINT_TK;
-    if (list[pos] == "INPUT") return INPUT_TK;
-    if (list[pos] == "GOTO") return GO_TK;
-    if (list[pos] == "IF") return IF_TK;
-    if (list[pos] == "END") return END_TK;
-    if (list[pos] == "+") return PLUS_TK;
-    if (list[pos] == "-") return MINUS_TK;
-    if (list[pos] == "**") return POW_TK;
-    if (list[pos] == "/") return DIV_TK;
-    if (list[pos] == "*") return MUL_TK;
-    if (list[pos] == "(") return LPAREN_TK;
-    if (list[pos] == ")") return RPAREN_TK;
-    if (list[pos] == "<") return LT_TK;
-    if (list[pos] == "=") return EQ_TK;
-    if (list[pos] == ">") return GT_TK;
-    if (list[pos][0] < '0' || list[pos][0] > '9') return STR_TK;
-    return INT_TK;
+    while (pos < list.size() && list[pos] == " ") {pos++;}
+    if (pos >= list.size()) return NULL_TK;
+    if (list[pos] == "") {bios = 0; return NULL_TK;}
+    if (list.mid(pos, 3) == "REM") {bios = 3; return REM_TK;}
+    if (list.mid(pos, 3) == "LET") {bios = 3; return LET_TK;}
+    if (list.mid(pos, 5) == "PRINT") {bios = 5; return PRINT_TK;}
+    if (list.mid(pos, 5) == "INPUT") {bios = 5; return INPUT_TK;}
+    if (list.mid(pos, 4) == "GOTO") {bios = 4; return GO_TK;}
+    if (list.mid(pos, 2) == "IF") {bios = 2; return IF_TK;}
+    if (list.mid(pos, 3) == "END") {bios = 3; return END_TK;}
+    if (list[pos] == '+') {bios = 1; return PLUS_TK;}
+    if (list[pos] == '-') {bios = 1; return MINUS_TK;}
+    if (list.mid(pos, 2) == "**") {bios = 2; return POW_TK;}
+    if (list[pos] == '/') {bios = 1; return DIV_TK;}
+    if (list[pos] == '*') {bios = 1; return MUL_TK;}
+    if (list[pos] == '(') {bios = 1; return LPAREN_TK;}
+    if (list[pos] == ')') {bios = 1; return RPAREN_TK;}
+    if (list[pos] == '<') {bios = 1; return LT_TK;}
+    if (list[pos] == '=') {bios = 1; return EQ_TK;}
+    if (list[pos] == '>') {bios = 1; return GT_TK;}
+    if (isLegalAlpha0(list[pos])) {
+        bios = 0;
+        while (pos + bios < list.size()
+               && isLegalAlpha1(list[pos + bios])) bios++;
+        return STR_TK;
+    }
+    if (list[pos] >= '0' && list[pos] <= '9') {
+        bios = 0;
+        while (pos + bios < list.size()
+               && list[pos + bios] >= '0'
+               && list[pos + bios] <= '9') bios++;
+        return INT_TK;
+    }
+    errorMsg("Unknown token");
+    return NULL_TK;
 }
 
+// must after getToken
 void MainWindow::advance() {
-    pos++;
+    pos += bios;
 }
 
 void MainWindow::run() {
@@ -62,7 +93,7 @@ void MainWindow::run() {
     int line_no = *lines.begin();
     while (line_no > 0) {
         WrappedStm cur = stms[line_no];
-        line_no = cur.stm_->exec(ui->textBrowser, ui->treeDisplay);
+        line_no = cur.stm_->exec(ui->textBrowser, ui->treeDisplay, 0);
     }
 }
 
@@ -72,8 +103,8 @@ bool MainWindow::parse(QString cmd) {
     Token curToken;
     pos = 0;
     cmd = cmd.trimmed();
-    list = cmd.split(" ");
-    if (list.empty()) {
+    list = cmd;
+    if (!list.size()) {
         errorMsg("empty command");
         return false;
     }
@@ -82,7 +113,12 @@ bool MainWindow::parse(QString cmd) {
         errorMsg("Parse line number error");
         return false; // fail
     }
-    line_no = list[pos].toInt(&ok, 10);
+    QString number = list.mid(pos, bios);
+    line_no = number.toInt(&ok, 10);
+    if (ok == false) {
+        errorMsg("Bad Int");
+        return false;
+    }
     advance();
     if (stms.count(line_no)) {
         errorMsg("The line number had existed");
@@ -102,7 +138,12 @@ Stm* MainWindow::stm(int line_no) {
     case NULL_TK:
         break;
     case LET_TK:
-        sym = list[pos].toStdString();
+        op_tk = getToken();
+        if (op_tk != STR_TK) {
+            errorMsg("Bad Let Stm");
+            return nullptr;
+        }
+        sym = list.mid(pos, bios).toStdString();
         advance();
         op_tk = getToken(); advance();
         if (op_tk != EQ_TK) {
@@ -132,7 +173,7 @@ Op MainWindow::token2Op(Token tk) {
     case POW_TK:
         return POW_OP;
     default:
-        errorMsg("unsupport arithmetic symbol");
+        errorMsg("unsupport arithmetic token");
         return PLUS_OP;
     }
 }
@@ -147,6 +188,7 @@ void debug(std::queue<Poi> outQueue) {
 }
 Exp* MainWindow::exp() {
     // 首先把中缀转后缀
+    QString tmp;
     Token curToken;
     std::stack<Token> opStack;
     std::queue<Poi> outQueue;
@@ -154,17 +196,19 @@ Exp* MainWindow::exp() {
     while(pos < list.size() && arithToken(getToken())) {
         curToken = getToken();
         if (curToken == INT_TK) {
-            outQueue.push(Poi(2, PLUS_OP, list[pos].toInt(nullptr, 10), ""));
+            tmp = list.mid(pos, bios);
+            outQueue.push(Poi(2, PLUS_OP, tmp.toInt(nullptr, 10), ""));
         }
         if (curToken == STR_TK) { // treat as int
-            outQueue.push(Poi(3, PLUS_OP, 0, list[pos].toStdString()));
+            tmp = list.mid(pos, bios);
+            outQueue.push(Poi(3, PLUS_OP, 0, tmp.toStdString()));
         }
         if (curToken == LPAREN_TK) {
             opStack.push(LPAREN_TK);
         }
         if (curToken == RPAREN_TK) {
             while (!opStack.empty() && opStack.top() != LPAREN_TK) {
-                outQueue.push(Poi(1, token2Op(curToken), 0, ""));
+                outQueue.push(Poi(1, token2Op(opStack.top()), 0, ""));
                 opStack.pop();
             }
             if (opStack.empty()) {
@@ -176,7 +220,8 @@ Exp* MainWindow::exp() {
         if (curToken == PLUS_TK || curToken == MINUS_TK
                 || curToken == MUL_TK || curToken == DIV_TK) {
             while (!opStack.empty() &&
-                   prio[token2Op(curToken)] <= prio[token2Op(opStack.top())]) { // left-asso
+                   opStack.top() != LPAREN_TK &&
+                   prio[curToken] <= prio[opStack.top()]) { // left-asso
                 outQueue.push(Poi(1, token2Op(opStack.top()), 0, ""));
                 opStack.pop();
             }
@@ -184,7 +229,8 @@ Exp* MainWindow::exp() {
         }
         if (curToken == POW_TK) {
             while (!opStack.empty() &&
-                   prio[token2Op(curToken)] < prio[token2Op(opStack.top())]) { // right-asso
+                   opStack.top() != LPAREN_TK &&
+                   prio[curToken] < prio[opStack.top()]) { // right-asso
                 outQueue.push(Poi(1, token2Op(opStack.top()), 0, ""));
                 opStack.pop();
             }
@@ -249,6 +295,8 @@ void MainWindow::on_btnClearCode_clicked()
 {
     ui->CodeDisplay->clear();
     ui->textBrowser->clear();
+    ui->treeDisplay->clear();
+
     intMap.clear();
     if (lines.empty()) return ;
     while (!lines.empty()) {
@@ -279,5 +327,6 @@ void MainWindow::on_btnLoadCode_clicked()
 void MainWindow::on_btnRunCode_clicked()
 {
     ui->textBrowser->clear();
+    ui->treeDisplay->clear();
     run();
 }
