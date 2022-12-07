@@ -45,6 +45,15 @@ bool isLegalAlpha0(QChar x) {
 bool isLegalAlpha1(QChar x) {
    return isLegalAlpha0(x) || (x >= '0' && x <= '9');
 }
+bool isDigit(QChar x) {
+    return x >= '0' && x <= '9';
+}
+bool isSymbol(QChar x) {
+    if (x == '+' || x == '-' || x == '*' || x == '/'
+        || x == "=" || x == "<" || x == ">")
+        return true;
+    return false;
+}
 Token MainWindow::getToken() {
     while (pos < list.size() && list[pos] == " ") {pos++;}
     if (pos >= list.size()) return NULL_TK;
@@ -98,6 +107,143 @@ void MainWindow::run() {
     }
 }
 
+/*
+ *  list[pos] is '-',
+ *  try to find length which can be replace
+ *  return  <= 0 for error
+ *
+ * */
+int findBound(QString list, int pos) {
+    int len = 1;
+    if (pos + len >= list.size()) return 0;
+    int par = 0;
+    bool hadP = false;
+    while (pos + len < list.size()) {
+        if (list[pos + len] == " ") {
+            return len - 1;
+        }
+        if (list.mid(pos + len, 4) == "THEN") { // should return
+            return len - 1;
+        }
+        if (isLegalAlpha0(list[pos + len])) { // skip a var
+            len++;
+            while (pos + len < list.size() &&
+                   isLegalAlpha1(list[pos + len])) {
+                len++;
+            }
+            continue;
+        }
+        if (isDigit(list[pos + len])) { // skip a number
+            len++;
+            while (pos + len < list.size()
+                   && isDigit(list[pos + len])) {
+                len++;
+            }
+            continue;
+        }
+        if (list[pos + len] == '(') { // start a paren
+            hadP = true;
+            par++;
+            len++;
+            continue;
+        }
+        if (list[pos + len] == ')') { // end a paren
+            if (!hadP) return 0; // not match
+            par--;
+            if (!par) return len; // match, return
+            len++;
+            continue;
+        }
+        if (isSymbol(list[pos + len])) {
+            if (par) { // if in paren, ignore
+                len++;
+                continue;
+            }
+            return len - 1; // terminate
+        }
+    }
+    if (par > 0) return 0; // unmatched
+    return len - 1;
+}
+
+/*
+ * try to rewrite an exp
+ * */
+void MainWindow::preExec(QString &list) {
+    int pos = 0;
+    bool isItem = false, flag = true;
+    QString head, sub;
+    while (flag) { // scan until no -
+        flag = false;
+        pos = 0; isItem = false;
+        while (pos < list.size()) {
+            if (list[pos] == ' ') {
+                pos++;
+                continue;
+            }
+            if (list[pos] == '<' || list[pos] == '>' || list[pos] == '=') {
+                break;
+            }
+            if (list.mid(pos, 4) == "THEN") {
+                break;
+            }
+            if (list[pos] == "(") {
+                isItem = false;
+                pos++;
+                continue;
+            }
+            if (list[pos] == ")") {
+                isItem = true;
+                pos++;
+                continue;
+            }
+            if (list[pos] == "*" || list[pos] == "+" || list[pos] == "/") {
+                isItem = false;
+                pos++;
+                continue;
+            }
+            if (list[pos] == '-') {
+                if (isItem) {
+                    isItem = false;
+                    pos++;
+                    continue;
+                }
+                // show replace
+                flag = true;
+                head = list.mid(0, pos);
+                int replace_len = findBound(list, pos);
+                if (replace_len <= 0) {
+                    //errorMsg("Parse Exp error");
+                    assert(0);
+                    return;
+                }
+                sub = list.mid(pos, replace_len + 1);
+                // replace sub with (0 sub)
+                list = head + "(0 " + sub + ")" + list.mid(pos + replace_len + 1);
+                break;
+            }
+            if (isLegalAlpha0(list[pos])) { // var
+                pos++;
+                while (pos < list.size() &&
+                       isLegalAlpha1(list[pos])) {
+                    pos++;
+                }
+                isItem = true;
+                continue;
+            }
+            if (isDigit(list[pos])) { // num
+                pos++;
+                while (pos < list.size() && isDigit(list[pos])) pos++;
+                isItem = true;
+                continue;
+            }
+            // default
+            pos++;
+            isItem = false;
+            continue;
+        }
+    }
+}
 bool MainWindow::parse(QString cmd) {
     bool ok = true;
     int line_no;
@@ -143,7 +289,7 @@ Stm* MainWindow::stm(int line_no) {
     int tmp;
     switch (curToken) {
     case NULL_TK:
-        break;
+        return nullptr;
     case REM_TK: {
         std::string str = list.mid(pos).toStdString();
         pos += str.size(); // to last
@@ -239,22 +385,17 @@ Op MainWindow::cmpToken2Op(Token tk) {
     }
 }
 
-void debug(std::queue<Poi> outQueue) {
-//    while (!outQueue.empty()) {
-//        Poi cur = outQueue.front();
-//        switch (cur.kind_) {
-//            case 1:
-
-//        }
-//    }
-}
 Exp* MainWindow::exp() {
     // 首先把中缀转后缀
-    QString tmp;
+    QString tmp, head, tail;
     Token curToken;
     std::stack<Token> opStack;
     std::queue<Poi> outQueue;
 
+    head = list.mid(0, pos);
+    tmp = list.mid(pos);
+    preExec(tmp);
+    list = head + tmp;
     while(pos < list.size() && arithToken(getToken())) {
         curToken = getToken();
         if (curToken == INT_TK) {
@@ -348,7 +489,14 @@ void MainWindow::on_cmdLineEdit_editingFinished()
     QString cmd = ui->cmdLineEdit->text();
     ui->cmdLineEdit->setText("");
 
-    parse(cmd);
+    try {
+        if (!parse(cmd)) {
+            ui->textBrowser->append("Grammar error");
+        }
+    } catch (std::exception &e) {
+        ui->textBrowser->append("Grammar error");
+    }
+
     ui->CodeDisplay->append(cmd);
 
 }
@@ -381,7 +529,13 @@ void MainWindow::on_btnLoadCode_clicked()
     while (!file.atEnd()) {
         QByteArray array = file.readLine();
         QString str = QString(array);
-        parse(str);
+        try {
+            if (!parse(str)) {
+                ui->textBrowser->append("Grammar error");
+            }
+        } catch (std::exception &e) {
+            ui->textBrowser->append("Grammar error");
+        }
         ui->CodeDisplay->append(str);
     }
 }
@@ -390,5 +544,9 @@ void MainWindow::on_btnRunCode_clicked()
 {
     ui->textBrowser->clear();
     ui->treeDisplay->clear();
-    run();
+    try {
+        run();
+    } catch (std::exception *&e) {
+        ui->textBrowser->append("Grammar error");
+    }
 }

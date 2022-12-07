@@ -34,6 +34,7 @@ private slots:
     Op token2Op(Token);
     Op cmpToken2Op(Token);
     bool arithToken(Token);
+    void preExec(QString &);
     void errorMsg(std::string );
     void run();
 

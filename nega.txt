@@ -1,0 +1,9 @@
+100 REM negative number handle
+105 LET a = 5
+110 PRINT -a
+120 PRINT -a * 5
+130 PRINT -(a+1)-3
+140 PRINT -a * -a
+150 IF -5 < -8 THEN 160
+160 PRINT 1
+170 PRINT 0
