@@ -32,6 +32,7 @@ private slots:
     Exp* construct_exp(Poi);
     Token getToken();
     Op token2Op(Token);
+    Op cmpToken2Op(Token);
     bool arithToken(Token);
     void errorMsg(std::string );
     void run();
@@ -44,5 +45,6 @@ private:
     Ui::MainWindow *ui;
     QString list;
     int pos, value, bios;
+    bool inputFlag;
 };
 #endif // MAINWINDOW_H

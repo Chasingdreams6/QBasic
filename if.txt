@@ -1,0 +1,8 @@
+100 REM test for if statement
+110 LET a = 5
+120 LET b = 6
+130 LET c = 7
+140 IF a > b THEN 170
+160 PRINT c
+170 PRINT 0
+180 END

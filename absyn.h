@@ -44,6 +44,7 @@ enum Token {
     INPUT_TK,
     GO_TK,
     IF_TK,
+    THEN_TK,
     END_TK,
     PLUS_TK,
     MINUS_TK,

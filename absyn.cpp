@@ -14,6 +14,12 @@ int quick_power(int a, int b) {
     return res;
 }
 
+int nextLine(int line) {
+    auto it = lines.upper_bound(line);
+    if (it == lines.end()) return -1;
+    return *it;
+}
+
 
 void CompoundExp::free()
 {
@@ -63,9 +69,7 @@ void CompoundExp::print(QTextBrowser *tree, int d)
 int RemStm::exec(QTextBrowser *res, QTextBrowser *tree, int d)
 {
     print(tree, d);
-    auto it = lines.upper_bound(pos_);
-    if (it == lines.end()) return -1;
-    return *it;
+    return nextLine(pos_);
 }
 
 void RemStm::print(QTextBrowser *tree, int d)
@@ -82,9 +86,7 @@ int LetStm::exec(QTextBrowser *res, QTextBrowser *tree, int d)
 {
     print(tree, d);
     intMap[sym_] = exp_->exec(res, tree, d + 1);
-    auto it = lines.upper_bound(pos_);
-    if (it == lines.end()) return -1;
-    return *it;
+    return nextLine(pos_);
 }
 
 void LetStm::free()
@@ -105,9 +107,7 @@ int PrintStm::exec(QTextBrowser *res, QTextBrowser *tree, int d)
     print(tree, d);
     int ans = exp_->exec(res, tree, d + 1);
     res->append(QString::number(ans));
-    auto it = lines.upper_bound(pos_);
-    if (it == lines.end()) return -1;
-    return *it;
+    return nextLine(pos_);
 }
 
 void PrintStm::free()
@@ -138,7 +138,8 @@ void InputStm::print(QTextBrowser *tree, int d)
 
 int GotoStm::exec(QTextBrowser *res, QTextBrowser *tree, int d)
 {
-
+    print(tree, d);
+    return to_;
 }
 
 void GotoStm::print(QTextBrowser *tree, int d)
@@ -151,7 +152,35 @@ void GotoStm::print(QTextBrowser *tree, int d)
 
 int IfStm::exec(QTextBrowser *res, QTextBrowser *tree, int d)
 {
-
+    print(tree, d);
+    int left= exp1_->exec(res, tree, d + 1);
+    int right = exp2_->exec(res, tree, d + 1);
+    bool flag = false;
+    switch (op_) {
+    case EQ_OP:
+        if (left == right) flag = true;
+        break;
+    case LT_OP:
+        if (left < right) flag = true;
+        break;
+    case GT_OP:
+        if (left > right) flag = true;
+        break;
+    default:
+        res->append("Unsupported compare");
+        break;
+    }
+    if (flag) {
+        QString tmp;
+        for (int i = 0; i < d; ++i) tmp += '\t';
+        tmp += QString::number(to_);
+        return to_;
+    } else {
+        QString tmp;
+        for (int i = 0; i < d; ++i) tmp += '\t';
+        tmp += QString::number(nextLine(pos_));
+        return nextLine(pos_);
+    }
 }
 
 void IfStm::free()
@@ -165,13 +194,16 @@ void IfStm::print(QTextBrowser *tree, int d)
     QString res;
     for (int i = 0; i < d; ++i) res += '\t';
     res += QString::number(pos_) + " IF THEN\n";
+    for (int i = 0; i < d; ++i) res += '\t';
+    res += QString(opC[op_].c_str());
     // TODO
     tree->append(res);
 }
 
 int EndStm::exec(QTextBrowser *res, QTextBrowser *tree, int d)
 {
-
+    print(tree, d);
+    return -1; // end
 }
 
 void EndStm::print(QTextBrowser *tree, int d)
