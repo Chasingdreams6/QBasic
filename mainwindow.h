@@ -37,6 +37,7 @@ private slots:
     void preExec(QString &);
     void errorMsg(std::string );
     void run();
+    void shuffle();
 
     void on_btnLoadCode_clicked();
 

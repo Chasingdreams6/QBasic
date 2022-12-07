@@ -484,6 +484,13 @@ Exp* MainWindow::build_exp(std::queue<Poi> outQueue) {
     return stack.top();
 }
 
+void MainWindow::shuffle() {
+  ui->CodeDisplay->clear();
+  for (auto it = lines.begin(); it != lines.end(); ++it) {
+      ui->CodeDisplay->append(QString(stms[*it].ori_.c_str()));
+  }
+}
+
 void MainWindow::on_cmdLineEdit_editingFinished()
 {
     QString cmd = ui->cmdLineEdit->text();
@@ -493,12 +500,11 @@ void MainWindow::on_cmdLineEdit_editingFinished()
         if (!parse(cmd)) {
             ui->textBrowser->append("Grammar error");
         }
+        ui->CodeDisplay->append(cmd);
     } catch (std::exception &e) {
         ui->textBrowser->append("Grammar error");
     }
-
-    ui->CodeDisplay->append(cmd);
-
+    shuffle();
 }
 
 void MainWindow::on_btnClearCode_clicked()
@@ -538,6 +544,7 @@ void MainWindow::on_btnLoadCode_clicked()
         }
         ui->CodeDisplay->append(str);
     }
+    shuffle();
 }
 
 void MainWindow::on_btnRunCode_clicked()
