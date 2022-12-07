@@ -5,6 +5,8 @@ std::map<Token, int> prio;
 std::set<int> lines;
 std::map<int, WrappedStm> stms;
 std::map<Op, std::string> opC;
+bool inputFlag = false;
+std::string inputVar;
 
 int quick_power(int a, int b) {
     if (!b) return 1;
@@ -125,14 +127,19 @@ void PrintStm::print(QTextBrowser *tree, int d)
 
 int InputStm::exec(QTextBrowser *res, QTextBrowser *tree, int d)
 {
-
+    print(tree, d);
+    inputFlag = true;
+    inputVar = sym_;
+    return nextLine(pos_);
 }
 
 void InputStm::print(QTextBrowser *tree, int d)
 {
     QString res;
     for (int i = 0; i < d; ++i) res += '\t';
-    res += QString::number(pos_) + " INPUT";
+    res += QString::number(pos_) + " INPUT\n";
+    for (int i = 0; i < d + 1; ++i) res += '\t';
+    res += QString(sym_.c_str());
     tree->append(res);
 }
 

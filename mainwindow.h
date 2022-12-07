@@ -47,6 +47,6 @@ private:
     Ui::MainWindow *ui;
     QString list;
     int pos, value, bios;
-    bool inputFlag;
+    int lastLine;
 };
 #endif // MAINWINDOW_H

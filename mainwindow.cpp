@@ -7,7 +7,16 @@ extern std::map<Token, int> prio;
 extern std::set<int> lines;
 extern std::map<int, WrappedStm> stms;
 extern std::map<Op, std::string> opC;
+extern bool inputFlag;
+extern std::string inputVar;
 
+/*
+    intMap store vars' value
+    prio store Op's priority
+    lines store line numbers
+    stms store lines' corresponding statement
+    opC store mapping from Op to char
+*/
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
@@ -23,6 +32,8 @@ MainWindow::MainWindow(QWidget *parent)
     opC[MUL_OP] = "*"; opC[DIV_OP] = "/";
     opC[POW_OP] = "**"; opC[EQ_OP] = "=";
     opC[LT_OP] = "<"; opC[GT_OP] = ">";
+
+    inputFlag = false;
 }
 
 MainWindow::~MainWindow()
@@ -30,13 +41,18 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
+/*
+    arithToken are tokens which is legal in expression
+*/
 bool MainWindow::arithToken(Token tk) {
     if (tk == PLUS_TK || tk == MINUS_TK || tk == MUL_TK || tk == DIV_TK) return true;
     if (tk == POW_TK || tk == LPAREN_TK || tk == RPAREN_TK || tk == INT_TK) return true;
     if (tk == STR_TK) return true;
     return false;
 }
-
+/*
+    true : can be seen as the first character of var
+*/
 bool isLegalAlpha0(QChar x) {
    return (x >= 'a' && x <= 'z')
            || (x >= 'A' && x <= 'Z')
@@ -54,6 +70,9 @@ bool isSymbol(QChar x) {
         return true;
     return false;
 }
+/*
+    get next token
+*/
 Token MainWindow::getToken() {
     while (pos < list.size() && list[pos] == " ") {pos++;}
     if (pos >= list.size()) return NULL_TK;
@@ -93,17 +112,27 @@ Token MainWindow::getToken() {
     return NULL_TK;
 }
 
-// must after getToken
+/* must after getToken
+ * shift
+*/
 void MainWindow::advance() {
     pos += bios;
 }
 
+/*
+    run the program
+*/
 void MainWindow::run() {
     if (lines.empty()) return ;
-    int line_no = *lines.begin();
+    int line_no = lastLine;
     while (line_no > 0) {
         WrappedStm cur = stms[line_no];
         line_no = cur.stm_->exec(ui->textBrowser, ui->treeDisplay, 0);
+        if (inputFlag) {
+            ui->cmdLineEdit->setText("?");
+            lastLine = line_no;
+            break;
+        }
     }
 }
 
@@ -167,7 +196,8 @@ int findBound(QString list, int pos) {
 }
 
 /*
- * try to rewrite an exp
+ * try to rewrite an exp,
+ *  -a * -a  =>  (0 - a) * (0 - a)
  * */
 void MainWindow::preExec(QString &list) {
     int pos = 0;
@@ -244,6 +274,9 @@ void MainWindow::preExec(QString &list) {
         }
     }
 }
+/*
+    parse the command
+*/
 bool MainWindow::parse(QString cmd) {
     bool ok = true;
     int line_no;
@@ -281,6 +314,9 @@ bool MainWindow::parse(QString cmd) {
     return true;
 }
 
+/*
+    construct AST tree for stm
+*/
 Stm* MainWindow::stm(int line_no) {
     Token curToken = getToken(); advance();
     Token op_tk;
@@ -346,13 +382,23 @@ Stm* MainWindow::stm(int line_no) {
     }
     case END_TK:
         return new EndStm(line_no);
+    case INPUT_TK:
+        op_tk = getToken();
+        if (op_tk != STR_TK) {
+            errorMsg("Expected symbol here");
+            return nullptr;
+        }
+        sym = list.mid(pos, bios).toStdString();
+        return new InputStm(line_no, sym);
     default:
         errorMsg("Unsupported statement now");
         return nullptr;
     }
 }
 
-
+/*
+    utility for Transform arithmetic token to Op
+*/
 Op MainWindow::token2Op(Token tk) {
     switch (tk) {
     case PLUS_TK:
@@ -371,6 +417,9 @@ Op MainWindow::token2Op(Token tk) {
     }
 }
 
+/*
+    utility for transform compare token to Op
+*/
 Op MainWindow::cmpToken2Op(Token tk) {
     switch (tk) {
     case EQ_TK:
@@ -385,6 +434,9 @@ Op MainWindow::cmpToken2Op(Token tk) {
     }
 }
 
+/*
+    parse expression
+*/
 Exp* MainWindow::exp() {
     // 首先把中缀转后缀
     QString tmp, head, tail;
@@ -448,6 +500,9 @@ Exp* MainWindow::exp() {
     return build_exp(outQueue);
 }
 
+/*
+    output an error Msg
+*/
 void MainWindow::errorMsg(std::string error) {
     ui->textBrowser->append(QString(error.c_str()));
 }
@@ -461,6 +516,9 @@ Exp* MainWindow::construct_exp(Poi e) {
     }
 }
 
+/*
+    construct Exp based on suffix
+*/
 Exp* MainWindow::build_exp(std::queue<Poi> outQueue) {
     std::stack<Exp*> stack;
     try {
@@ -484,6 +542,9 @@ Exp* MainWindow::build_exp(std::queue<Poi> outQueue) {
     return stack.top();
 }
 
+/*
+    reorder commands
+*/
 void MainWindow::shuffle() {
   ui->CodeDisplay->clear();
   for (auto it = lines.begin(); it != lines.end(); ++it) {
@@ -496,15 +557,30 @@ void MainWindow::on_cmdLineEdit_editingFinished()
     QString cmd = ui->cmdLineEdit->text();
     ui->cmdLineEdit->setText("");
 
-    try {
-        if (!parse(cmd)) {
+    if (inputFlag) {
+        if (cmd[0] == "?")
+            cmd = cmd.mid(1);
+        bool ok;
+        int val = cmd.toInt(&ok, 10);
+        if (ok == false) {
+            errorMsg("expected int here");
+            return ;
+        }
+        intMap[inputVar] = val;
+        ui->treeDisplay->append(cmd);
+        inputFlag = false;
+        run(); // continue
+    } else {
+        try {
+            if (!parse(cmd)) {
+                ui->textBrowser->append("Grammar error");
+            }
+            ui->CodeDisplay->append(cmd);
+        } catch (std::exception &e) {
             ui->textBrowser->append("Grammar error");
         }
-        ui->CodeDisplay->append(cmd);
-    } catch (std::exception &e) {
-        ui->textBrowser->append("Grammar error");
+        shuffle();
     }
-    shuffle();
 }
 
 void MainWindow::on_btnClearCode_clicked()
@@ -523,6 +599,7 @@ void MainWindow::on_btnClearCode_clicked()
     }
     lines.clear();
     stms.clear();
+    inputFlag = false;
 }
 
 void MainWindow::on_btnLoadCode_clicked()
@@ -552,6 +629,9 @@ void MainWindow::on_btnRunCode_clicked()
     ui->textBrowser->clear();
     ui->treeDisplay->clear();
     try {
+        if (!lines.empty()) {
+            lastLine = *lines.begin();
+        }
         run();
     } catch (std::exception *&e) {
         ui->textBrowser->append("Grammar error");
