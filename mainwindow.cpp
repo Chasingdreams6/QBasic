@@ -277,7 +277,7 @@ void MainWindow::preExec(QString &list) {
 /*
     parse the command
 */
-bool MainWindow::parse(QString cmd) {
+Status MainWindow::parse(QString cmd) {
     bool ok = true;
     int line_no;
     Token curToken;
@@ -286,32 +286,38 @@ bool MainWindow::parse(QString cmd) {
     list = cmd;
     if (!list.size()) {
         errorMsg("empty command");
-        return false;
+        return Status::ERROR;
     }
     curToken = getToken();
     if (curToken != INT_TK) {
         errorMsg("Parse line number error");
-        return false; // fail
+        return Status::ERROR; // fail
     }
     QString number = list.mid(pos, bios);
     line_no = number.toInt(&ok, 10);
     if (ok == false) {
         errorMsg("Bad Int");
-        return false;
+        return Status::ERROR;
     }
     advance();
     if (stms.count(line_no)) {
-        errorMsg("The line number had existed");
-        return false;
+        if (getToken() != NULL_TK) {
+            errorMsg("The line number had existed");
+            return Status::ERROR;
+        } else { // just to delete
+            lines.erase(line_no);
+            stms.erase(line_no);
+            return Status::DELETE;
+        }
     }
     Stm* tmp = stm(line_no);
     if (tmp == nullptr) { // illegal stm, ignore it
-        return false;
+        return Status::ERROR;
     }
     lines.insert(line_no);
     WrappedStm cur(line_no, tmp, cmd.toStdString());
     stms[line_no] = cur;
-    return true;
+    return Status::ADD;
 }
 
 /*
@@ -583,10 +589,14 @@ void MainWindow::on_cmdLineEdit_editingFinished()
         run(); // continue
     } else {
         try {
-            if (!parse(cmd)) {
+            Status status = parse(cmd);
+            if (status == Status::ERROR) {
                 ui->textBrowser->append("Grammar error");
             }
-            ui->CodeDisplay->append(cmd);
+            else if (status == Status::ADD)
+                ui->CodeDisplay->append(cmd);
+            else
+                ui->textBrowser->append("Succeed to delete line " + cmd);
         } catch (std::exception &e) {
             ui->textBrowser->append("Grammar error");
         }
@@ -624,10 +634,14 @@ void MainWindow::on_btnLoadCode_clicked()
         QByteArray array = file.readLine();
         QString str = QString(array);
         try {
-            if (!parse(str)) {
+            Status status = parse(str);
+            if (status == Status::ERROR) {
                 ui->textBrowser->append("Grammar error");
             }
-            ui->CodeDisplay->append(str);
+            else if (status == Status::ADD)
+                ui->CodeDisplay->append(str);
+            else
+                ui->textBrowser->append("Succeed to delete line " + str);
         } catch (std::exception &e) {
             ui->textBrowser->append("Grammar error");
         }

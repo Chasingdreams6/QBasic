@@ -23,7 +23,7 @@ private slots:
     void on_cmdLineEdit_editingFinished();
 
     void on_btnClearCode_clicked();
-    bool parse(QString);
+    Status parse(QString);
     //bool eat(enum Token);
     inline void advance();
     Stm* stm(int );

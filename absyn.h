@@ -57,6 +57,11 @@ enum Token {
     LT_TK,
     GT_TK
 };
+enum Status {
+    ADD,
+    DELETE,
+    ERROR
+};
 
 class Stm {
 public:
