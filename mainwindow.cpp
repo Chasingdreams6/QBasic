@@ -344,10 +344,17 @@ Stm* MainWindow::stm(int line_no) {
             errorMsg("Invalid let stm");
             return nullptr;
         }
-        return new LetStm(line_no, sym, exp());
+        Exp *expp = exp();
+        if (expp)
+            return new LetStm(line_no, sym, expp);
+        return nullptr;
     }
-    case PRINT_TK:
-        return new PrintStm(line_no, exp());
+    case PRINT_TK: {
+        Exp *expp = exp();
+        if (expp)
+            return new PrintStm(line_no, expp);
+        return nullptr;
+    }
     case GO_TK: {
         op_tk = getToken();
         if (op_tk != INT_TK) {
@@ -359,6 +366,8 @@ Stm* MainWindow::stm(int line_no) {
     }
     case IF_TK: {
         Exp* left = exp();
+        if (left == nullptr)
+            return nullptr;
         op_tk = getToken();
         if (op_tk != EQ_TK && op_tk != LT_TK && op_tk != GT_TK) {
             errorMsg("Unsupported compare in If Stm");
@@ -366,6 +375,8 @@ Stm* MainWindow::stm(int line_no) {
         }
         cmp_op = cmpToken2Op(op_tk); advance();
         Exp* right = exp();
+        if (right == nullptr)
+            return nullptr;
         op_tk = getToken();
         if (op_tk != THEN_TK) {
             errorMsg("expected THEN");
@@ -616,10 +627,10 @@ void MainWindow::on_btnLoadCode_clicked()
             if (!parse(str)) {
                 ui->textBrowser->append("Grammar error");
             }
+            ui->CodeDisplay->append(str);
         } catch (std::exception &e) {
             ui->textBrowser->append("Grammar error");
         }
-        ui->CodeDisplay->append(str);
     }
     shuffle();
 }
